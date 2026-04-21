@@ -23,8 +23,10 @@ make all
 `object_write` prepends a `"<type> <size>\0"` header to the data, hashes the whole thing with SHA-256, skips writing if the object already exists (deduplication), creates the shard directory, writes to a temp file, fsyncs, and renames atomically. This guarantees the object store is never left with a partial file even on a crash.
 
 `object_read` reverifies the SHA-256 after reading (integrity check), parses the type and declared size from the header, validates the declared size against the actual byte count, then returns the data portion in a caller-owned buffer.
+
 **Screenshot 1A:** `./test_objects` 
 <img width="922" height="149" alt="1A" src="https://github.com/user-attachments/assets/91020e6b-e0d5-4e9a-877e-f6ac94a97028" />
+
 
 **Screenshot 1B:** `find .pes/objects -type f`
 <img width="941" height="227" alt="1B" src="https://github.com/user-attachments/assets/a8ef3905-0536-4285-971f-597b773bb0b0" />
@@ -32,6 +34,7 @@ make all
 ---
 
 ## Phase 2: Tree Objects
+
 **Files modified:** `tree.c`,`makefile`
 
 `tree_from_index` heap-allocates the `Index` struct (it is ~5.6 MB, which exceeds the safe stack budget), loads the index, sorts entries by path, then calls the recursive `write_tree_level` helper.
@@ -41,12 +44,14 @@ make all
 **Screenshot 2A:** `./test_tree` 
 <img width="547" height="127" alt="2A" src="https://github.com/user-attachments/assets/318f0a8b-c797-4dde-a7b5-f387ec027acf" />
 
+
 **Screenshot 2B:**   `xxd` of a raw binary format.
 <img width="1166" height="492" alt="2B" src="https://github.com/user-attachments/assets/702ce6ff-adad-44c0-bd35-9d6ac13bf431" />
 
 ---
 
 ## Phase 3: The Index (Staging Area)
+
 **Files modified:** `index.c`
 
 `index_load` opens `.pes/index` with `fopen("r")` and parses each line with `fscanf` using the format `%o %64s %llu %u %511s`. A missing index file is treated as an empty staging area, not an error.
@@ -58,33 +63,43 @@ make all
 **Screenshot 3A:** `./pes init`-> `./pes add `->`./pes status`
 <img width="644" height="573" alt="3A" src="https://github.com/user-attachments/assets/af3a312b-9e3f-443c-a24f-6857cc103271" />
 
+
 **Screenshot 3B:** `cat .pes/index` 
 <img width="938" height="99" alt="3B" src="https://github.com/user-attachments/assets/7239f0b0-3b5c-419d-ad23-3f9aed24fa33" />
 
 ---
 
 ## Phase 4: Commits and History
+
 **Files modified:** `commit.c`
 
 `commit_create` calls `tree_from_index` to snapshot the staged state, reads the current HEAD to find the parent commit (absent for the first commit), fills a `Commit` struct with author (PES_AUTHOR env var), Unix timestamp, and message, serialises it with `commit_serialize`, stores it via `object_write(OBJ_COMMIT)`, then calls head_update to advance the branch pointer atomically.
+
 
 **Screenshot 4A:** `./pes log` with three commits
 
 <img width="742" height="392" alt="4A" src="https://github.com/user-attachments/assets/fcc33174-14c3-4c74-8d62-e41031c3594f" />
 
+
 **Screenshot 4B:** `find .pes -type f | sort`
 
 <img width="786" height="262" alt="4B" src="https://github.com/user-attachments/assets/9f32bc67-2279-4f83-a15b-9fc7e534dfa6" />
 
+
 **Screenshot 4C:** `Reference chain`
 <img width="616" height="112" alt="4C" src="https://github.com/user-attachments/assets/41a74fc1-057f-4d90-ad88-bf2a28137558" />
+
 
 **final** `make test-integration`
 <img width="773" height="744" alt="F1" src="https://github.com/user-attachments/assets/7a650a7a-2f44-4e01-ba8a-ab07df10d2c7" />
 
+
 <img width="796" height="723" alt="F2" src="https://github.com/user-attachments/assets/a6136c9f-6fac-408d-b2cc-e28ba693780b" />
 
+
+
 <img width="761" height="267" alt="F3" src="https://github.com/user-attachments/assets/43eb9f8c-866b-493a-bcba-9a1202230a5a" />
+
 
 ---
 
@@ -98,6 +113,7 @@ If the target branch is new, create `.pes/refs/heads/<target>` pointing to the d
 Working-directory update:
 
 Read the target branch tip from `.pes/refs/heads/<branch>`.
+
 `object_read` the root tree of that commit.
 Recursively walk the tree: for blob entries write (or overwrite) the file in the working directory; for tree entries (mode `040000`) create directories.
 Delete any working-directory file that is present in the current HEAD's tree but absent from the target tree.
@@ -110,9 +126,13 @@ Three-way diff. Deciding which files to touch requires comparing the current-HEA
 
 **Q5.2:** Detecting dirty working-directory conflicts
 Using only the index and the object store:
+
 1.Load the current index (the staged snapshot matching HEAD after the last commit).
+
 2.For each entry, `stat()` the working-directory file. If `st_mtime` or `st_size` differs from the stored values, re-hash the file (SHA-256) and compare to the stored hash. A mismatch means the file is dirty.
+
 3.For each path in the target branch's tree: if that path is in the index and is dirty (step 2), refuse checkout for that path.
+
 4.For untracked files: if a path in the target tree does not appear in the index but already exists on disk, refuse checkout to avoid overwriting it.
 
 The mtime/size check is a fast first pass; the full hash re-read is the authoritative check used only when metadata differs.
@@ -130,7 +150,9 @@ echo "ref: refs/heads/recovered" > .pes/HEAD
 Recovery after switching away: the commit objects still exist in the object store. Walk every file under `.pes/objects/`, call `object_read` on each, and look for `OBJ_COMMIT` objects whose parent chain leads to your lost work. Git calls this `git fsck --lost-found`. The GC grace period (see Q6.2) keeps the objects safe for at least two weeks.
 
 
-### Garbage Collection
+---
+
+### Phase 6:Garbage Collection
 
 **Q6.1:** Algorithm to find and delete unreachable objects
 
@@ -139,7 +161,9 @@ Mark-and-sweep:
 Mark phase — build the reachable set:
 
  1.Enumerate every file under `.pes/refs/` and read `HEAD` to get the GC roots.
+ 
  2.For each root commit hash, call `object_read`. Add its hash, the tree hash,    and every blob/subtree hash found by recursively walking the tree to a    `reachable` set. Follow each commit's parent pointer until `has_parent == 0`.
+ 
 Data structure: a sorted array of ObjectID (32 bytes each) with binary search — O(n log n) to build, O(log n) per lookup. A hash table gives O(1) average lookup for larger repos.
 
 Sweep phase — delete unreachable objects:
@@ -150,14 +174,17 @@ Estimate for 100,000 commits, 50 branches:
 
 Assuming roughly four unique objects per commit on average (one commit, one to two trees, one to two new blobs, the rest shared):
 
-Reachable set ≈ 400,000 objects → 400,000 `object_read` calls in the mark phase.
-Sweep: walk all ~400,000 files in the object store.
-Total: roughly 800,000 file accesses.
+1.Reachable set ≈ 400,000 objects → 400,000 `object_read` calls in the mark phase.
+
+2.Sweep: walk all ~400,000 files in the object store.
+
+3.Total: roughly 800,000 file accesses.
+
 
 **Q6.2:** Race condition between GC and a concurrent commit
 
-### Screenshots Required
 
+**The Race:**
 |Time| `pes commit`  |      GC                                                |
 |--- | --- | -----------------------------------------------------------------|
 | t1 | `object_write(OBJ_BLOB) stores blob B`  |—                             |
