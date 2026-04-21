@@ -23,10 +23,10 @@ make all
 `object_write` prepends a `"<type> <size>\0"` header to the data, hashes the whole thing with SHA-256, skips writing if the object already exists (deduplication), creates the shard directory, writes to a temp file, fsyncs, and renames atomically. This guarantees the object store is never left with a partial file even on a crash.
 
 `object_read` reverifies the SHA-256 after reading (integrity check), parses the type and declared size from the header, validates the declared size against the actual byte count, then returns the data portion in a caller-owned buffer.
-**📸 Screenshot 1A:** `./test_objects` 
+**Screenshot 1A:** `./test_objects` 
 <img width="922" height="149" alt="1A" src="https://github.com/user-attachments/assets/91020e6b-e0d5-4e9a-877e-f6ac94a97028" />
 
-**📸 Screenshot 1B:** `find .pes/objects -type f`
+**Screenshot 1B:** `find .pes/objects -type f`
 <img width="941" height="227" alt="1B" src="https://github.com/user-attachments/assets/a8ef3905-0536-4285-971f-597b773bb0b0" />
 
 ---
