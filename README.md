@@ -38,10 +38,10 @@ make all
 
 `write_tree_level` walks the sorted entries at one directory level. For each plain file entry (no `/` in the remaining path) it adds a blob `TreeEntry`. For each directory it groups all entries that share the top-level component, recurses to get the subtree's hash, and adds a 040000 tree entry. After processing all entries it serialises the `Tree` struct and writes it to the object store.
 
-**📸 Screenshot 2A:** `./test_tree` 
+**Screenshot 2A:** `./test_tree` 
 <img width="547" height="127" alt="2A" src="https://github.com/user-attachments/assets/318f0a8b-c797-4dde-a7b5-f387ec027acf" />
 
-**📸 Screenshot 2B:**   `xxd` of a raw binary format.
+**Screenshot 2B:**   `xxd` of a raw binary format.
 <img width="1166" height="492" alt="2B" src="https://github.com/user-attachments/assets/702ce6ff-adad-44c0-bd35-9d6ac13bf431" />
 
 ---
@@ -55,10 +55,10 @@ make all
 
 `index_add` reads the file, stores it as `OBJ_BLOB`, stats the file for mtime/size metadata used for fast change detection, upserts the entry, and calls `index_save`.
 
-**📸 Screenshot 3A:** `./pes init`-> `./pes add `->`./pes status`
+**Screenshot 3A:** `./pes init`-> `./pes add `->`./pes status`
 <img width="644" height="573" alt="3A" src="https://github.com/user-attachments/assets/af3a312b-9e3f-443c-a24f-6857cc103271" />
 
-**📸 Screenshot 3B:** `cat .pes/index` 
+**Screenshot 3B:** `cat .pes/index` 
 <img width="938" height="99" alt="3B" src="https://github.com/user-attachments/assets/7239f0b0-3b5c-419d-ad23-3f9aed24fa33" />
 
 ---
@@ -68,15 +68,15 @@ make all
 
 `commit_create` calls `tree_from_index` to snapshot the staged state, reads the current HEAD to find the parent commit (absent for the first commit), fills a `Commit` struct with author (PES_AUTHOR env var), Unix timestamp, and message, serialises it with `commit_serialize`, stores it via `object_write(OBJ_COMMIT)`, then calls head_update to advance the branch pointer atomically.
 
-**📸 Screenshot 4A:** `./pes log` with three commits
+**Screenshot 4A:** `./pes log` with three commits
 
 <img width="742" height="392" alt="4A" src="https://github.com/user-attachments/assets/fcc33174-14c3-4c74-8d62-e41031c3594f" />
 
-**📸 Screenshot 4B:** `find .pes -type f | sort`
+**Screenshot 4B:** `find .pes -type f | sort`
 
 <img width="786" height="262" alt="4B" src="https://github.com/user-attachments/assets/9f32bc67-2279-4f83-a15b-9fc7e534dfa6" />
 
-**📸 Screenshot 4C:** `Reference chain`
+**Screenshot 4C:** `Reference chain`
 <img width="616" height="112" alt="4C" src="https://github.com/user-attachments/assets/41a74fc1-057f-4d90-ad88-bf2a28137558" />
 
 **final** `make test-integration`
